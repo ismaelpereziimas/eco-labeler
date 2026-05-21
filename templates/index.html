@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etiquetado Anillo Mitral / Tricúspide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 p-8 font-sans">
+
+    <div class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-3xl font-bold mb-6 text-blue-600">🫀 Herramienta de Etiquetado Médico</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="space-y-6">
+                <div class="p-4 border rounded bg-gray-50">
+                    <label class="block font-semibold mb-2">1. Subir Video</label>
+                    <input type="file" id="videoInput" accept="video/*" class="w-full text-sm">
+                    <button onclick="uploadVideo()" class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded">Cargar Video</button>
+                    <p id="uploadStatus" class="text-xs text-gray-500 mt-2 hidden">Procesando frames...</p>
+                </div>
+
+                <div class="p-4 border rounded bg-gray-50">
+                    <label class="block font-semibold mb-2">2. Tipo de Válvula</label>
+                    <div class="flex gap-4">
+                        <label><input type="radio" name="valve" value="Mitral" checked> Mitral (Rojo)</label>
+                        <label><input type="radio" name="valve" value="Tricúspide"> Tricúspide (Azul)</label>
+                    </div>
+                </div>
+
+                <div class="p-4 border rounded bg-gray-50">
+                    <label class="block font-semibold mb-2">3. Acciones</label>
+                    <button onclick="deleteCurrentFramePoints()" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded mb-2">Borrar Puntos de este Frame</button>
+                    <button onclick="downloadDataset()" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded">Descargar Dataset (ZIP)</button>
+                </div>
+            </div>
+
+            <div class="md:col-span-2">
+                <div class="mb-4 flex items-center justify-between">
+                    <span class="font-semibold">Frame Actual: <span id="frameCounter">0</span> / <span id="totalFrames">0</span></span>
+                    <div>
+                        <button onclick="prevFrame()" class="bg-gray-300 hover:bg-gray-400 px-4 py-1 rounded">- Ant</button>
+                        <button onclick="nextFrame()" class="bg-gray-300 hover:bg-gray-400 px-4 py-1 rounded">Sig +</button>
+                    </div>
+                </div>
+                
+                <input type="range" id="frameSlider" min="0" max="0" value="0" class="w-full mb-4" oninput="slideFrame(this.value)">
+
+                <div class="border-2 border-dashed border-gray-400 rounded flex justify-center bg-black overflow-hidden" style="min-height: 400px;">
+                    <canvas id="videoCanvas" class="cursor-crosshair max-w-full"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ESTADO DE LA APLICACIÓN (Reemplaza los gr.State de Gradio)
+        let frames = [];
+        let currentFrameIdx = 0;
+        let points = []; 
+        let sessionId = "";
+        let videoName = "";
+        
+        // ELEMENTOS DEL DOM
+        const canvas = document.getElementById('videoCanvas');
+        const ctx = canvas.getContext('2d');
+        let currentImage = new Image();
+
+        // 1. CARGAR VIDEO AL SERVIDOR
+        async function uploadVideo() {
+            const fileInput = document.getElementById('videoInput');
+            if (!fileInput.files[0]) return alert("Selecciona un video primero.");
+
+            document.getElementById('uploadStatus').classList.remove('hidden');
+            
+            const formData = new FormData();
+            formData.append('video', fileInput.files[0]);
+
+            const response = await fetch('/upload_video', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            
+            if (data.error) return alert(data.error);
+
+            frames = data.frames;
+            sessionId = data.session_id;
+            videoName = data.video_name;
+            currentFrameIdx = 0;
+            points = [];
+
+            // Actualizar UI
+            document.getElementById('uploadStatus').classList.add('hidden');
+            document.getElementById('totalFrames').innerText = frames.length - 1;
+            document.getElementById('frameSlider').max = frames.length - 1;
+            
+            loadFrame();
+        }
+
+        // 2. RENDERIZAR FRAME Y PUNTOS
+        function loadFrame() {
+            if (frames.length === 0) return;
+            
+            currentImage.src = frames[currentFrameIdx];
+            currentImage.onload = () => {
+                // Ajustar tamaño del canvas al tamaño real de la imagen
+                canvas.width = currentImage.width;
+                canvas.height = currentImage.height;
+                drawCanvas();
+            };
+            
+            document.getElementById('frameCounter').innerText = currentFrameIdx;
+            document.getElementById('frameSlider').value = currentFrameIdx;
+        }
+
+        function drawCanvas() {
+            // Dibujar la imagen base
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(currentImage, 0, 0);
+
+            // Dibujar los puntos almacenados para este frame
+            points.forEach(p => {
+                if (p.Frame === currentFrameIdx) {
+                    ctx.beginPath();
+                    ctx.arc(p.X, p.Y, 6, 0, 2 * Math.PI, false);
+                    ctx.fillStyle = p.Valve === 'Mitral' ? 'red' : 'blue';
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = 'white';
+                    ctx.stroke();
+                }
+            });
+        }
+
+        // 3. REGISTRAR CLIC EN EL CANVAS
+        canvas.addEventListener('mousedown', function(event) {
+            if (frames.length === 0) return;
+
+            // Calcular coordenadas exactas relativas al canvas escalado
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            const x = Math.round((event.clientX - rect.left) * scaleX);
+            const y = Math.round((event.clientY - rect.top) * scaleY);
+            
+            const valveType = document.querySelector('input[name="valve"]:checked').value;
+
+            // Eliminar punto anterior de la misma válvula en este frame (igual que tu lógica original)
+            points = points.filter(p => !(p.Frame === currentFrameIdx && p.Valve === valveType));
+
+            // Agregar el nuevo punto
+            points.push({
+                Video: videoName,
+                Frame: currentFrameIdx,
+                X: x,
+                Y: y,
+                Valve: valveType
+            });
+
+            drawCanvas(); // Re-renderizar
+        });
+
+        // 4. CONTROLES DE NAVEGACIÓN
+        function nextFrame() {
+            if (currentFrameIdx < frames.length - 1) {
+                currentFrameIdx++;
+                loadFrame();
+            }
+        }
+
+        function prevFrame() {
+            if (currentFrameIdx > 0) {
+                currentFrameIdx--;
+                loadFrame();
+            }
+        }
+
+        function slideFrame(val) {
+            currentFrameIdx = parseInt(val);
+            loadFrame();
+        }
+
+        function deleteCurrentFramePoints() {
+            points = points.filter(p => p.Frame !== currentFrameIdx);
+            drawCanvas();
+        }
+
+        // 5. DESCARGAR DATASET
+        async function downloadDataset() {
+            if (points.length === 0) return alert("No hay puntos etiquetados.");
+
+            const response = await fetch('/download_dataset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ points: points, session_id: sessionId })
+            });
+
+            if (response.ok) {
+                // Truco de JS para descargar el archivo binario (ZIP)
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `dataset_${sessionId}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } else {
+                alert("Error al generar el dataset.");
+            }
+        }
+    </script>
+</body>
+</html>
