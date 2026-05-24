@@ -20,9 +20,20 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 MAIN_FOLDER_ID = '1uAT53DkI8J6BaiREw-9-shcM-97chyVI'
 
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
-# Carga la llave maestra que descargaste
-creds = service_account.Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
+
+# LÓGICA SEGURA DE CREDENCIALES
+google_creds_env = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+
+if google_creds_env:
+    # Si estamos en la nube (Render), lee la variable de entorno secreta
+    creds_dict = json.loads(google_creds_env)
+    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+else:
+    # Si estamos en tu computadora local, lee el archivo
+    creds = service_account.Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
+
 drive_service = build('drive', 'v3', credentials=creds)
+
 
 def get_drive_folders(parent_id):
     """Busca todas las subcarpetas dentro de una carpeta principal."""
