@@ -87,30 +87,36 @@ def load_video():
     })
 
 @app.route('/save_csv', methods=['POST'])
-def save_csv():
-    data = request.json
-    points = data.get('points', [])
-    video_name = data.get('video_name', 'video_desconocido')
-    
-    if not points:
-        return jsonify({"error": "Faltan datos"}), 400
 
-    values = []
-    for p in points:
-        values.append([video_name, p['Frame'], p['X'], p['Y'], p['Valve']])
-    
-    body = {'values': values}
-    
+def save_csv():
     try:
-        sheets_service.spreadsheets().values().append(
+        data = request.json
+        points = data.get('points', [])
+        video_name = data.get('video_name', 'video_desconocido')
+        
+        if not points:
+            return jsonify({"error": "No hay puntos"}), 400
+
+        sheets_service = build('sheets', 'v4', credentials=creds)
+        
+        values = []
+        for p in points:
+            values.append([video_name, p['Frame'], p['X'], p['Y'], p['Valve']])
+        
+        body = {'values': values}
+        
+        # Guardamos el resultado de la llamada para ver si da error aquí
+        response = sheets_service.spreadsheets().values().append(
             spreadsheetId=SHEET_ID,
             range='Hoja1!A2',
             valueInputOption='RAW',
             body=body
         ).execute()
         
-        return jsonify({"success": True, "message": "Datos guardados en Sheets"})
+        return jsonify({"success": True, "message": "Datos guardados"})
+        
     except Exception as e:
+        # AQUÍ ESTÁ EL TRUCO: Enviamos el error real al navegador
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
