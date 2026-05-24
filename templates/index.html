@@ -9,7 +9,7 @@
 <body class="bg-gray-100 text-gray-800 p-8 font-sans">
 
     <div class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-lg">
-        <h1 class="text-3xl font-bold mb-6 text-blue-600"> Programa de etiquetado Anillo Auricular</h1>
+        <h1 class="text-3xl font-bold mb-6 text-blue-600">🫀 Herramienta de Etiquetado Médico</h1>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             
@@ -17,9 +17,9 @@
                 
                 <div class="p-4 border rounded bg-blue-50 border-blue-200">
                     <label class="block font-semibold mb-1 text-blue-800">Carpeta / Video Actual:</label>
-                    <div id="videoNameDisplay" class="text-xl font-bold text-blue-600 mb-4">A4C_00001</div>
-                    <button onclick="nextVideoFolder()" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded font-semibold shadow">
-                        Cargar Siguiente Video 
+                    <div id="videoNameDisplay" class="text-xl font-bold text-blue-600 mb-4">Cargando Drive...</div>
+                    <button onclick="nextVideoFolder()" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded font-semibold shadow transition duration-200">
+                        Cargar Siguiente Video ⏭️
                     </button>
                 </div>
 
@@ -33,11 +33,11 @@
 
                 <div class="p-4 border rounded bg-gray-50">
                     <label class="block font-semibold mb-2">Acciones</label>
-                    <button onclick="deleteCurrentFramePoints()" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded mb-3 shadow">
+                    <button onclick="deleteCurrentFramePoints()" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded mb-3 shadow transition duration-200">
                         Borrar Puntos de este Frame
                     </button>
-                    <button onclick="saveVideoCSV()" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded font-semibold shadow">
-                        Guardar CSV del Video 
+                    <button onclick="saveVideoCSV()" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded font-semibold shadow transition duration-200">
+                        Guardar CSV del Video 💾
                     </button>
                 </div>
             </div>
@@ -61,45 +61,116 @@
     </div>
 
     <script>
+        // ESTADOS DE LA APLICACIÓN
+        let folders = [];
+        let currentFolderIdx = 0;
         let frames = [];
         let currentFrameIdx = 0;
         let points = []; 
-        let currentVideoName = "A4C_00001";
+        let currentVideoName = "";
         
         const canvas = document.getElementById('videoCanvas');
         const ctx = canvas.getContext('2d');
         let currentImage = new Image();
 
+        // 1. OBTENER CARPETAS AL CARGAR LA PÁGINA
+        window.onload = async function() {
+            try {
+                const response = await fetch('/api/get_folders');
+                const data = await response.json();
+                
+                if (data.folders && data.folders.length > 0) {
+                    folders = data.folders;
+                    currentFolderIdx = 0;
+                    loadVideoData(folders[currentFolderIdx]);
+                } else {
+                    document.getElementById('videoNameDisplay').innerText = "Carpeta vacía";
+                    alert("No se encontraron subcarpetas en tu Drive.");
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Error al conectar con Google Drive.");
+            }
+        };
+
+        // 2. DESCARGAR Y CARGAR LAS IMÁGENES DEL VIDEO SELECCIONADO
+        async function loadVideoData(folder) {
+            document.getElementById('videoNameDisplay').innerText = "Descargando " + folder.name + "...";
+            
+            try {
+                const response = await fetch('/api/load_video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder_id: folder.id, folder_name: folder.name })
+                });
+                const data = await response.json();
+                
+                if (data.error) return alert(data.error);
+
+                frames = data.frames;
+                currentVideoName = data.video_name;
+                currentFrameIdx = 0;
+                points = []; // Limpiamos los puntos para el nuevo video
+
+                // Actualizar interfaz
+                document.getElementById('videoNameDisplay').innerText = currentVideoName;
+                document.getElementById('totalFrames').innerText = frames.length > 0 ? frames.length - 1 : 0;
+                document.getElementById('frameSlider').max = frames.length > 0 ? frames.length - 1 : 0;
+                
+                if(frames.length > 0) {
+                    loadFrame();
+                } else {
+                    alert("No se encontraron imágenes en esta carpeta.");
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Error al descargar los frames.");
+            }
+        }
+
+        // 3. NAVEGAR AL SIGUIENTE VIDEO
+        function nextVideoFolder() {
+            if (currentFolderIdx < folders.length - 1) {
+                currentFolderIdx++;
+                loadVideoData(folders[currentFolderIdx]);
+            } else {
+                alert("¡Felicidades! Has terminado de etiquetar todos los videos de la carpeta principal.");
+            }
+        }
+
+        // ==========================================
+        // LÓGICA DE DIBUJO Y NAVEGACIÓN DE FRAMES
+        // ==========================================
+        
         function loadFrame() {
-            // Cuando conectemos Drive, aquí pondremos la imagen real.
-            // Por ahora, solo actualizamos los números.
+            if (frames.length === 0) return;
+            
+            currentImage.src = frames[currentFrameIdx];
+            currentImage.onload = () => {
+                canvas.width = currentImage.width;
+                canvas.height = currentImage.height;
+                drawCanvas();
+            };
+            
             document.getElementById('frameCounter').innerText = currentFrameIdx;
             document.getElementById('frameSlider').value = currentFrameIdx;
-            drawCanvas();
         }
 
         function drawCanvas() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if(currentImage.src) {
-                ctx.drawImage(currentImage, 0, 0);
-            } else {
-                // Fondo negro temporal si no hay imagen
-                ctx.fillStyle = "black";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
+            ctx.drawImage(currentImage, 0, 0);
 
+            // DIBUJAR LAS CRUZES
             points.forEach(p => {
                 if (p.Frame === currentFrameIdx) {
-                    const size = 8; // Tamaño de la cruz
+                    const size = 10; // Tamaño de la cruz
                     ctx.beginPath();
-                    // Línea horizontal
                     ctx.moveTo(p.X - size, p.Y);
                     ctx.lineTo(p.X + size, p.Y);
-                    // Línea vertical
                     ctx.moveTo(p.X, p.Y - size);
                     ctx.lineTo(p.X, p.Y + size);
                     
-                    ctx.strokeStyle = p.Valve === 'Mitral' ? '#ff4444' : '#4444ff';
+                    ctx.strokeStyle = p.Valve === 'Mitral' ? '#ff2222' : '#2222ff';
                     ctx.lineWidth = 3;
                     ctx.stroke();
                 }
@@ -107,6 +178,8 @@
         }
 
         canvas.addEventListener('mousedown', function(event) {
+            if (frames.length === 0) return;
+
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
@@ -116,6 +189,7 @@
             
             const valveType = document.querySelector('input[name="valve"]:checked').value;
 
+            // Evitar duplicados de la misma válvula en el mismo frame
             points = points.filter(p => !(p.Frame === currentFrameIdx && p.Valve === valveType));
 
             points.push({
@@ -129,8 +203,8 @@
             drawCanvas();
         });
 
-        function nextFrame() { currentFrameIdx++; loadFrame(); }
-        function prevFrame() { if (currentFrameIdx > 0) currentFrameIdx--; loadFrame(); }
+        function nextFrame() { if (currentFrameIdx < frames.length - 1) { currentFrameIdx++; loadFrame(); } }
+        function prevFrame() { if (currentFrameIdx > 0) { currentFrameIdx--; loadFrame(); } }
         function slideFrame(val) { currentFrameIdx = parseInt(val); loadFrame(); }
         
         function deleteCurrentFramePoints() {
@@ -138,7 +212,9 @@
             drawCanvas();
         }
 
-        // NUEVA FUNCIÓN: Descargar CSV directamente
+        // ==========================================
+        // GUARDAR CSV
+        // ==========================================
         async function saveVideoCSV() {
             if (points.length === 0) return alert("No hay puntos marcados para guardar.");
 
@@ -158,20 +234,10 @@
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
-                alert("CSV guardado correctamente.");
             } else {
-                alert("Error al guardar el CSV.");
+                alert("Error al generar el CSV.");
             }
         }
-
-        // NUEVA FUNCIÓN: Siguiente Video
-        function nextVideoFolder() {
-            // Aquí pediremos al backend (Python) que busque la siguiente carpeta en Drive
-            alert("Aquí nos conectaremos a Google Drive para traer la carpeta A4C_00002");
-        }
-
-        // Inicializar
-        loadFrame();
     </script>
 </body>
 </html>
