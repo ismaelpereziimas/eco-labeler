@@ -2,10 +2,10 @@ import os
 import json
 import io
 import pandas as pd
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, jsonify
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseDownload
 
 app = Flask(__name__)
 
@@ -13,8 +13,12 @@ UPLOAD_FOLDER = 'static/frames'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 MAIN_FOLDER_ID = '1uAT53DkI8J6BaiREw-9-shcM-97chyVI'
+SHEET_ID = '1XbCOIxB3-VupP8V-r5Ocdq68Wl4vHd8gfPhZhgIoWcE'
 
-SCOPES = ['https://www.googleapis.com/auth/drive']
+SCOPES = [
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/spreadsheets'
+]
 
 google_creds_env = os.environ.get('GOOGLE_CREDENTIALS_JSON')
 
@@ -25,6 +29,7 @@ else:
     creds = service_account.Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
 
 drive_service = build('drive', 'v3', credentials=creds)
+sheets_service = build('sheets', 'v4', credentials=creds)
 
 def get_drive_folders(parent_id):
     query = f"'{parent_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
@@ -86,33 +91,27 @@ def save_csv():
     data = request.json
     points = data.get('points', [])
     video_name = data.get('video_name', 'video_desconocido')
-    folder_id = data.get('folder_id')
     
-    if not points or not folder_id:
+    if not points:
         return jsonify({"error": "Faltan datos"}), 400
 
-    df = pd.DataFrame(points)
-    csv_string = df.to_csv(index=False)
+    values = []
+    for p in points:
+        values.append([video_name, p['Frame'], p['X'], p['Y'], p['Valve']])
     
-    file_metadata = {
-        'name': f"{video_name}_etiquetas.csv",
-        'parents': [folder_id]
-    }
+    body = {'values': values}
     
-    query = f"name = '{file_metadata['name']}' and '{folder_id}' in parents and trashed=false"
-    existing_files = drive_service.files().list(q=query, fields="files(id)").execute().get('files', [])
-
-    media = MediaIoBaseUpload(io.BytesIO(csv_string.encode('utf-8')), mimetype='text/csv')
-    
-    if existing_files:
-        file_id = existing_files[0]['id']
-        drive_service.files().update(fileId=file_id, media_body=media).execute()
-        message = "CSV actualizado"
-    else:
-        drive_service.files().create(body=file_metadata, media_body=media).execute()
-        message = "CSV creado"
-
-    return jsonify({"success": True, "message": message})
+    try:
+        sheets_service.spreadsheets().values().append(
+            spreadsheetId=SHEET_ID,
+            range='Hoja1!A2',
+            valueInputOption='RAW',
+            body=body
+        ).execute()
+        
+        return jsonify({"success": True, "message": "Datos guardados en Sheets"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
