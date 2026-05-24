@@ -9,7 +9,7 @@
 <body class="bg-gray-100 text-gray-800 p-8 font-sans">
 
     <div class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-lg">
-        <h1 class="text-3xl font-bold mb-6 text-blue-600">🫀 Herramienta de Etiquetado Médico</h1>
+        <h1 class="text-3xl font-bold mb-6 text-blue-600"> App para Etiquetado Anillo</h1>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             
@@ -37,7 +37,7 @@
                         Borrar Puntos de este Frame
                     </button>
                     <button onclick="saveVideoCSV()" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded font-semibold shadow transition duration-200">
-                        Guardar CSV del Video 💾
+                        Guardar CSV en Drive 💾
                     </button>
                 </div>
             </div>
@@ -61,7 +61,6 @@
     </div>
 
     <script>
-        // ESTADOS DE LA APLICACIÓN
         let folders = [];
         let currentFolderIdx = 0;
         let frames = [];
@@ -73,7 +72,6 @@
         const ctx = canvas.getContext('2d');
         let currentImage = new Image();
 
-        // 1. OBTENER CARPETAS AL CARGAR LA PÁGINA
         window.onload = async function() {
             try {
                 const response = await fetch('/api/get_folders');
@@ -93,7 +91,6 @@
             }
         };
 
-        // 2. DESCARGAR Y CARGAR LAS IMÁGENES DEL VIDEO SELECCIONADO
         async function loadVideoData(folder) {
             document.getElementById('videoNameDisplay').innerText = "Descargando " + folder.name + "...";
             
@@ -110,9 +107,8 @@
                 frames = data.frames;
                 currentVideoName = data.video_name;
                 currentFrameIdx = 0;
-                points = []; // Limpiamos los puntos para el nuevo video
+                points = []; 
 
-                // Actualizar interfaz
                 document.getElementById('videoNameDisplay').innerText = currentVideoName;
                 document.getElementById('totalFrames').innerText = frames.length > 0 ? frames.length - 1 : 0;
                 document.getElementById('frameSlider').max = frames.length > 0 ? frames.length - 1 : 0;
@@ -128,19 +124,14 @@
             }
         }
 
-        // 3. NAVEGAR AL SIGUIENTE VIDEO
         function nextVideoFolder() {
             if (currentFolderIdx < folders.length - 1) {
                 currentFolderIdx++;
                 loadVideoData(folders[currentFolderIdx]);
             } else {
-                alert("¡Felicidades! Has terminado de etiquetar todos los videos de la carpeta principal.");
+                alert("¡Felicidades! Has terminado de etiquetar todos los videos.");
             }
         }
-
-        // ==========================================
-        // LÓGICA DE DIBUJO Y NAVEGACIÓN DE FRAMES
-        // ==========================================
         
         function loadFrame() {
             if (frames.length === 0) return;
@@ -160,10 +151,9 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(currentImage, 0, 0);
 
-            // DIBUJAR LAS CRUZES
             points.forEach(p => {
                 if (p.Frame === currentFrameIdx) {
-                    const size = 10; // Tamaño de la cruz
+                    const size = 10;
                     ctx.beginPath();
                     ctx.moveTo(p.X - size, p.Y);
                     ctx.lineTo(p.X + size, p.Y);
@@ -189,7 +179,6 @@
             
             const valveType = document.querySelector('input[name="valve"]:checked').value;
 
-            // Evitar duplicados de la misma válvula en el mismo frame
             points = points.filter(p => !(p.Frame === currentFrameIdx && p.Valve === valveType));
 
             points.push({
@@ -212,30 +201,25 @@
             drawCanvas();
         }
 
-        // ==========================================
-        // GUARDAR CSV
-        // ==========================================
         async function saveVideoCSV() {
-            if (points.length === 0) return alert("No hay puntos marcados para guardar.");
+            if (points.length === 0) return alert("No hay puntos marcados.");
 
             const response = await fetch('/save_csv', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ points: points, video_name: currentVideoName })
+                body: JSON.stringify({ 
+                    points: points, 
+                    video_name: currentVideoName,
+                    folder_id: folders[currentFolderIdx].id 
+                })
             });
 
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `${currentVideoName}_etiquetas.csv`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
+            const result = await response.json();
+            
+            if (result.success) {
+                alert("¡Guardado exitosamente en Google Drive!");
             } else {
-                alert("Error al generar el CSV.");
+                alert("Error al guardar: " + (result.error || "Algo salió mal"));
             }
         }
     </script>
