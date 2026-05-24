@@ -119,4 +119,7 @@ def save_csv():
     return send_file(csv_path, as_attachment=True)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Obtener el puerto desde el entorno de Render (o usar 5000 si no existe)
+    port = int(os.environ.get("PORT", 5000))
+    # 'host=0.0.0.0' hace que la app sea visible desde afuera
+    app.run(host='0.0.0.0', port=port)
