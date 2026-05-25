@@ -105,7 +105,6 @@ def save_csv():
         
         body = {'values': values}
         
-        # Guardamos el resultado de la llamada para ver si da error aquí
         response = sheets_service.spreadsheets().values().append(
             spreadsheetId=SHEET_ID,
             range='Hoja1!A2',
@@ -116,7 +115,6 @@ def save_csv():
         return jsonify({"success": True, "message": "Datos guardados"})
         
     except Exception as e:
-        # AQUÍ ESTÁ EL TRUCO: Enviamos el error real al navegador
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
