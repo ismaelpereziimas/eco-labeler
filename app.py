@@ -13,7 +13,7 @@ UPLOAD_FOLDER = 'static/frames'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ID de tu carpeta nueva y hoja de Sheets
-MAIN_FOLDER_ID = '1YSvqtbbbdUdXoFwezdOM-7qZJLyT8dU'
+MAIN_FOLDER_ID = '1YSvqtbbbdUdXoFwezdOM-7qZJLyT8dUv'
 SHEET_ID = '1XbCOIxB3-VupP8V-r5Ocdq68Wl4vHd8gfPhZhgIoWcE'
 
 SCOPES = [
