@@ -32,7 +32,7 @@
                 </div>
 
                 <div class="p-4 border rounded bg-gray-50">
-                    <label class="block font-semibold mb-2">Acciones</label>
+                    <label class="block font-semibold mb-2">Acciones de Puntos</label>
                     <button onclick="deleteCurrentFramePoints()" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded mb-3 shadow transition duration-200">
                         Borrar Puntos de este Frame
                     </button>
@@ -40,14 +40,27 @@
                         Guardar CSV en Drive 💾
                     </button>
                 </div>
+
+                <div class="p-4 border rounded bg-indigo-50 border-indigo-200">
+                    <label class="block font-semibold mb-2 text-indigo-800">Registrar Fase del Ciclo</label>
+                    <div class="flex gap-2">
+                        <button onclick="savePhase('Sístole')" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded font-semibold shadow transition duration-200">
+                            Sístole
+                        </button>
+                        <button onclick="savePhase('Diástole')" class="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 rounded font-semibold shadow transition duration-200">
+                            Diástole
+                        </button>
+                    </div>
+                </div>
+
             </div>
 
             <div class="md:col-span-2">
                 <div class="mb-4 flex items-center justify-between">
                     <span class="font-semibold">Frame Actual: <span id="frameCounter">0</span> / <span id="totalFrames">0</span></span>
                     <div>
-                        <button onclick="prevFrame()" class="bg-gray-300 hover:bg-gray-400 px-4 py-1 rounded shadow-sm">- Ant</button>
-                        <button onclick="nextFrame()" class="bg-gray-300 hover:bg-gray-400 px-4 py-1 rounded shadow-sm">Sig +</button>
+                        <button onclick="prevFrame()" class="bg-gray-300 hover:bg-gray-400 px-4 py-1 rounded shadow-sm" title="Puedes usar la flecha Izquierda del teclado">- Ant</button>
+                        <button onclick="nextFrame()" class="bg-gray-300 hover:bg-gray-400 px-4 py-1 rounded shadow-sm" title="Puedes usar la flecha Derecha del teclado">Sig +</button>
                     </div>
                 </div>
                 
@@ -192,9 +205,19 @@
             drawCanvas();
         });
 
+        // Controles de navegación de frames
         function nextFrame() { if (currentFrameIdx < frames.length - 1) { currentFrameIdx++; loadFrame(); } }
         function prevFrame() { if (currentFrameIdx > 0) { currentFrameIdx--; loadFrame(); } }
         function slideFrame(val) { currentFrameIdx = parseInt(val); loadFrame(); }
+        
+        // Atajos de teclado para las flechas
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "ArrowRight") {
+                nextFrame();
+            } else if (event.key === "ArrowLeft") {
+                prevFrame();
+            }
+        });
         
         function deleteCurrentFramePoints() {
             points = points.filter(p => p.Frame !== currentFrameIdx);
@@ -220,6 +243,28 @@
                 alert("¡Guardado exitosamente en Google Drive!");
             } else {
                 alert("Error al guardar: " + (result.error || "Algo salió mal"));
+            }
+        }
+
+        async function savePhase(fase) {
+            if (!currentVideoName) return alert("Carga un video primero.");
+
+            const response = await fetch('/save_phase', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    video_name: currentVideoName,
+                    frame: currentFrameIdx,
+                    fase: fase
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(`Fase: ${fase} registrada correctamente en el frame ${currentFrameIdx}`);
+            } else {
+                alert("Error al guardar la fase: " + result.error);
             }
         }
     </script>
