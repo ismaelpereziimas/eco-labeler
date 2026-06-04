@@ -12,7 +12,7 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'static/frames'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-MAIN_FOLDER_ID = '1YSvqtbbbdUdXoFwezdOM-7qZJLyT8dUv?hl'
+MAIN_FOLDER_ID = '1YSvqtbbbdUdXoFwezdOM-7qZJLyT8dUv'
 SHEET_ID = '1XbCOIxB3-VupP8V-r5Ocdq68Wl4vHd8gfPhZhgIoWcE'
 
 SCOPES = [
