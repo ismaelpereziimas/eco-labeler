@@ -34,9 +34,9 @@
                 <div class="p-4 border rounded bg-indigo-50">
                     <label class="block font-semibold mb-2 text-indigo-800">2. Fase del Ciclo</label>
                     <div class="flex gap-4 text-sm">
-                        <label class="cursor-pointer"><input type="radio" name="fase" value="N/A" checked> Ninguna</label>
-                        <label class="cursor-pointer text-orange-600 font-bold"><input type="radio" name="fase" value="Sístole"> Sístole</label>
-                        <label class="cursor-pointer text-purple-600 font-bold"><input type="radio" name="fase" value="Diástole"> Diástole</label>
+                        <label class="cursor-pointer"><input type="radio" name="fase" value="N/A" onchange="updateFaseInFrame(this.value)" checked> Ninguna</label>
+                        <label class="cursor-pointer text-orange-600 font-bold"><input type="radio" name="fase" value="Sístole" onchange="updateFaseInFrame(this.value)"> Sístole</label>
+                        <label class="cursor-pointer text-purple-600 font-bold"><input type="radio" name="fase" value="Diástole" onchange="updateFaseInFrame(this.value)"> Diástole</label>
                     </div>
                 </div>
 
@@ -154,6 +154,18 @@
             
             document.getElementById('frameCounter').innerText = currentFrameIdx;
             document.getElementById('frameSlider').value = currentFrameIdx;
+
+            // NUEVO: Sincronizar los botones de Fase con lo que ya está guardado en este frame
+            const pointsInFrame = points.filter(p => p.Frame === currentFrameIdx);
+            if (pointsInFrame.length > 0) {
+                // Si ya hay puntos, toma la fase del primer punto y selecciona el botón correspondiente
+                const faseToSet = pointsInFrame[0].Fase;
+                const radioBtn = document.querySelector(`input[name="fase"][value="${faseToSet}"]`);
+                if(radioBtn) radioBtn.checked = true;
+            } else {
+                // Si no hay puntos, regresa por defecto a "Ninguna"
+                document.querySelector('input[name="fase"][value="N/A"]').checked = true;
+            }
         }
 
         function drawCanvas() {
@@ -186,7 +198,6 @@
             const x = Math.round((event.clientX - rect.left) * scaleX);
             const y = Math.round((event.clientY - rect.top) * scaleY);
             
-            // Obtenemos los valores de AMBOS selectores
             const valveType = document.querySelector('input[name="valve"]:checked').value;
             const faseType = document.querySelector('input[name="fase"]:checked').value;
 
@@ -198,11 +209,20 @@
                 X: x,
                 Y: y,
                 Valve: valveType,
-                Fase: faseType // Guardamos la fase junto con el punto
+                Fase: faseType 
             });
 
             drawCanvas();
         });
+
+        // NUEVA FUNCIÓN: Actualiza la fase de los puntos que ya están dibujados si cambias el botón
+        function updateFaseInFrame(newFase) {
+            points.forEach(p => {
+                if (p.Frame === currentFrameIdx) {
+                    p.Fase = newFase;
+                }
+            });
+        }
 
         function nextFrame() { if (currentFrameIdx < frames.length - 1) { currentFrameIdx++; loadFrame(); } }
         function prevFrame() { if (currentFrameIdx > 0) { currentFrameIdx--; loadFrame(); } }
@@ -218,6 +238,8 @@
         
         function deleteCurrentFramePoints() {
             points = points.filter(p => p.Frame !== currentFrameIdx);
+            // Regresa a "Ninguna" al borrar
+            document.querySelector('input[name="fase"][value="N/A"]').checked = true;
             drawCanvas();
         }
 
