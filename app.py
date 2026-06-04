@@ -12,6 +12,7 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'static/frames'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# ID de tu carpeta nueva y hoja de Sheets
 MAIN_FOLDER_ID = '1YSvqtbbbdUdXoFwezDOM-7qZJLyT8dUv'
 SHEET_ID = '1XbCOIxB3-VupP8V-r5Ocdq68Wl4vHd8gfPhZhgIoWcE'
 
@@ -38,7 +39,6 @@ def get_drive_folders(parent_id):
 
 def get_drive_images(folder_id):
     query = f"'{folder_id}' in parents and mimeType contains 'image/' and trashed=false"
-    # El orderBy="name" garantiza que se mantenga el orden cronológico seq_00, seq_01, etc.
     results = drive_service.files().list(q=query, fields="files(id, name)", orderBy="name").execute()
     return results.get('files', [])
 
@@ -101,7 +101,8 @@ def save_csv():
         
         values = []
         for p in points:
-            values.append([video_name, p['Frame'], p['X'], p['Y'], p['Valve']])
+            # Agregamos la nueva variable p['Fase'] a la lista de columnas a guardar
+            values.append([video_name, p['Frame'], p['X'], p['Y'], p['Valve'], p['Fase']])
         
         body = {'values': values}
         
@@ -113,33 +114,6 @@ def save_csv():
         ).execute()
         
         return jsonify({"success": True, "message": "Datos guardados"})
-        
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/save_phase', methods=['POST'])
-def save_phase():
-    try:
-        data = request.json
-        video_name = data.get('video_name', 'video_desconocido')
-        frame = data.get('frame')
-        fase = data.get('fase')
-
-        sheets_service = build('sheets', 'v4', credentials=creds)
-        
-        # Guardamos N/A en las coordenadas X y Y, y la fase en la columna Valve/Fase
-        values = [[video_name, frame, "N/A", "N/A", fase]]
-        
-        body = {'values': values}
-        
-        response = sheets_service.spreadsheets().values().append(
-            spreadsheetId=SHEET_ID,
-            range='Hoja1!A2',
-            valueInputOption='RAW',
-            body=body
-        ).execute()
-        
-        return jsonify({"success": True, "message": f"Fase {fase} guardada"})
         
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
