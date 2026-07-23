@@ -48,21 +48,15 @@ def index():
 
 @app.route('/api/get_folders', methods=['GET'])
 def get_folders():
-  @app.route('/api/get_folders', methods=['GET'])
-def get_folders():
     try:
-        # 1. Obtiene todas las carpetas de Drive (ya vienen en orden alfabético)
         folders = get_drive_folders(MAIN_FOLDER_ID)
         
-        # --- MODIFICACIÓN MANUAL AQUÍ ---
-        # 2. Escribe el nombre exacto de la carpeta desde la que deben empezar hoy
-        carpeta_inicio = 'A4C_00023'
+        # --- MODIFICACIÓN: Define desde qué carpeta iniciar ---
+        carpeta_inicio = 'A4C_00023' 
         
-        # 3. Filtramos la lista. Python compara los strings alfabéticamente.
-        # Solo conservará las carpetas cuyo nombre sea igual o mayor a 'A4C_00023'
+        # Filtramos para que solo envíe de la 23 en adelante
         carpetas_filtradas = [f for f in folders if f['name'] >= carpeta_inicio]
         
-        # 4. Enviamos la lista recortada al frontend
         return jsonify({'folders': carpetas_filtradas})
         
     except Exception as e:
